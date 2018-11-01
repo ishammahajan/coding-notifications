@@ -20,7 +20,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return new MaterialApp(
-      title: 'Flutter Demo',
+      title: 'CNotif++',
       theme: new ThemeData(
         primarySwatch: Colors.deepOrange,
       ),
@@ -73,7 +73,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text("Contest Notifs"),
+        title: Text("CNotif++"),
         actions: <Widget>[
           IconButton(
               icon: Icon(Icons.search),
@@ -91,7 +91,7 @@ class _MyHomePageState extends State<MyHomePage> {
             builder: (_, snapshot) {
               if (!snapshot.hasData) return Center(child: CircularProgressIndicator());
               var contestElement = snapshot.data.getElementById("contests");
-              contestList = favorites;
+              contestList = favorites.toList();
               var contests = contestElement.getElementsByClassName("row contest coming");
 
               // Creating two different methods for adding because some contest elements have more attributes than others for some reason
@@ -113,13 +113,19 @@ class _MyHomePageState extends State<MyHomePage> {
                 if (!contestList.any((c) {
                   return toBeAdded.title == c.title;
                 })) {
-                  contestList.add(toBeAdded);
-                  for(int i = favorites.length; i < contestList.length; i++) {
-                    if(contestList[i].startAt.compareTo(toBeAdded.startAt) == 1) {
-                      contestList.insert(i, toBeAdded);
-                      break;
+                  if (favorites.length == contestList.length)
+                    contestList.add(toBeAdded);
+                  else
+                    for (int i = favorites.length; i < contestList.length; i++) {
+                      if (contestList.last.startAt.compareTo(toBeAdded.startAt) == -1) {
+                        contestList.add(toBeAdded);
+                        break;
+                      }
+                      if (contestList[i].startAt.compareTo(toBeAdded.startAt) == 1) {
+                        contestList.insert(i, toBeAdded);
+                        break;
+                      }
                     }
-                  }
                 }
               });
 
@@ -267,7 +273,6 @@ class _ContestDisplayState extends State<ContestDisplay> {
     );
   }
 }
-
 
 // Serialization helper class to store Contest information in the shared preferences
 class ContestDessert extends DesSer<Contest> {
