@@ -52,19 +52,10 @@ class _MyHomePageState extends State<MyHomePage> {
   List<Contest> favorites = [];
 
   Future<dom.Document> getCompetitions() async {
-    print("Hi");
     var repo = new FuturePreferencesRepository<Contest>(new ContestDessert());
     favorites = await repo.findAll();
-    print(favorites);
-    print("Hi");
     var response = await get("https://clist.by/");
     return parse(response.body);
-  }
-
-  Function setThisState() {
-    return () async {
-      await getCompetitions();
-    };
   }
 
   @override
@@ -74,35 +65,6 @@ class _MyHomePageState extends State<MyHomePage> {
     var initializationSettingsIOS = new IOSInitializationSettings();
     var initializationSettings = new InitializationSettings(initializationSettingsAndroid, initializationSettingsIOS);
     flutterLocalNotificationsPlugin.initialize(initializationSettings, selectNotification: (str) {});
-  }
-
-  int getMonth(String s) {
-    switch (s) {
-      case 'Jan':
-        return 1;
-      case 'Feb':
-        return 2;
-      case 'Mar':
-        return 3;
-      case 'Apr':
-        return 4;
-      case 'May':
-        return 5;
-      case 'Jun':
-        return 6;
-      case 'Jul':
-        return 7;
-      case 'Aug':
-        return 8;
-      case 'Sep':
-        return 9;
-      case 'Oct':
-        return 10;
-      case 'Nov':
-        return 11;
-      case 'Dec':
-        return 12;
-    }
   }
 
   @override
@@ -144,13 +106,14 @@ class _MyHomePageState extends State<MyHomePage> {
                       endAt: DateTime.parse(currentContest[31].trim()).add(DateTime.now().timeZoneOffset),
                       site: currentContest[35].trim(),
                     );
-              if (!contestList.any((c) {return toBeAdded.title == c.title;})) contestList.add(toBeAdded);
+              if (!contestList.any((c) {
+                return toBeAdded.title == c.title;
+              })) contestList.add(toBeAdded);
             });
 
             // Returning widget for each contest in contestList
             return ContestDisplay(
               contestList: contestList,
-              callback: setThisState,
             );
           }),
     );
@@ -181,8 +144,22 @@ class SearchContests extends SearchDelegate {
 
   @override
   Widget buildResults(BuildContext context) {
-    // TODO: implement buildResults
-    return null;
+    Map<String, int> searchHere = new Map();
+    List<Contest> contestsShown = [];
+    contests.forEach((contest) {
+      searchHere.putIfAbsent(contest.title.toLowerCase(), () => contests.indexOf(contest));
+      searchHere.putIfAbsent(contest.site, () => contests.indexOf(contest));
+    });
+    bool repeating = false;
+    searchHere.forEach((str, index) {
+      if (repeating)
+        repeating = false;
+      else if (str.contains(query.toLowerCase())) {
+        repeating = true;
+        contestsShown.add(contests[index]);
+      }
+    });
+    return ContestDisplay(contestList: contestsShown);
   }
 
   @override
@@ -202,25 +179,24 @@ class SearchContests extends SearchDelegate {
         contestsShown.add(contests[index]);
       }
     });
-    return ContestDisplay(contestList: contestsShown);
+    print(contestsShown);
+    return ContestDisplay(contestList: contestsShown).createState().build(context);
   }
 }
 
 class ContestDisplay extends StatefulWidget {
   final List<Contest> contestList;
-  final Function callback;
 
-  ContestDisplay({@required this.contestList, this.callback});
+  ContestDisplay({@required this.contestList});
 
   @override
-  _ContestDisplayState createState() => _ContestDisplayState(contestList: contestList, callback: callback);
+  _ContestDisplayState createState() => _ContestDisplayState(contestList: contestList);
 }
 
 class _ContestDisplayState extends State<ContestDisplay> {
   List<Contest> contestList;
-  Function callback;
 
-  _ContestDisplayState({@required this.contestList, this.callback});
+  _ContestDisplayState({@required this.contestList});
 
   @override
   Widget build(BuildContext context) {
@@ -265,7 +241,6 @@ class _ContestDisplayState extends State<ContestDisplay> {
                   ),
                   onPressed: () async {
                     contest.isFavorite = contest.isFavorite != null ? !contest.isFavorite : true;
-                    print(contest.isFavorite);
                     var repo = new FuturePreferencesRepository<Contest>(new ContestDessert());
                     if (contest.isFavorite)
                       repo.save(contest);
@@ -274,8 +249,6 @@ class _ContestDisplayState extends State<ContestDisplay> {
                         return c.title == contest.title;
                       });
                     setState(() {});
-                    this.build(context);
-                    await callback();
                   }),
             ),
           ),
