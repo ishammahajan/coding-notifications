@@ -82,40 +82,53 @@ class _MyHomePageState extends State<MyHomePage> {
               })
         ],
       ),
-      body: FutureBuilder<dom.Document>(
-          future: getCompetitions(),
-          builder: (_, snapshot) {
-            if (!snapshot.hasData) return Center(child: CircularProgressIndicator());
-            var contestElement = snapshot.data.getElementById("contests");
-            contestList = favorites;
-            var contests = contestElement.getElementsByClassName("row contest coming");
+      body: RefreshIndicator(
+        onRefresh: () {
+          return getCompetitions();
+        },
+        child: FutureBuilder<dom.Document>(
+            future: getCompetitions(),
+            builder: (_, snapshot) {
+              if (!snapshot.hasData) return Center(child: CircularProgressIndicator());
+              var contestElement = snapshot.data.getElementById("contests");
+              contestList = favorites;
+              var contests = contestElement.getElementsByClassName("row contest coming");
 
-            // Creating two different methods for adding because some contest elements have more attributes than others for some reason
-            contests.forEach((e) {
-              var currentContest = e.text.split('\n');
-              var toBeAdded = e.text.split('\n')[30].trim() == "UTC"
-                  ? Contest(
-                      title: currentContest[31].trim(),
-                      startAt: DateTime.parse(currentContest[28].trim()).add(DateTime.now().timeZoneOffset),
-                      endAt: DateTime.parse(currentContest[29].trim()).add(DateTime.now().timeZoneOffset),
-                      site: currentContest[33].trim(),
-                    )
-                  : Contest(
-                      title: currentContest[33].trim(),
-                      startAt: DateTime.parse(currentContest[30].trim()).add(DateTime.now().timeZoneOffset),
-                      endAt: DateTime.parse(currentContest[31].trim()).add(DateTime.now().timeZoneOffset),
-                      site: currentContest[35].trim(),
-                    );
-              if (!contestList.any((c) {
-                return toBeAdded.title == c.title;
-              })) contestList.add(toBeAdded);
-            });
+              // Creating two different methods for adding because some contest elements have more attributes than others for some reason
+              contests.forEach((e) {
+                var currentContest = e.text.split('\n');
+                var toBeAdded = e.text.split('\n')[30].trim() == "UTC"
+                    ? Contest(
+                        title: currentContest[31].trim(),
+                        startAt: DateTime.parse(currentContest[28].trim()).add(DateTime.now().timeZoneOffset),
+                        endAt: DateTime.parse(currentContest[29].trim()).add(DateTime.now().timeZoneOffset),
+                        site: currentContest[33].trim(),
+                      )
+                    : Contest(
+                        title: currentContest[33].trim(),
+                        startAt: DateTime.parse(currentContest[30].trim()).add(DateTime.now().timeZoneOffset),
+                        endAt: DateTime.parse(currentContest[31].trim()).add(DateTime.now().timeZoneOffset),
+                        site: currentContest[35].trim(),
+                      );
+                if (!contestList.any((c) {
+                  return toBeAdded.title == c.title;
+                })) {
+                  contestList.add(toBeAdded);
+                  for(int i = favorites.length; i < contestList.length; i++) {
+                    if(contestList[i].startAt.compareTo(toBeAdded.startAt) == 1) {
+                      contestList.insert(i, toBeAdded);
+                      break;
+                    }
+                  }
+                }
+              });
 
-            // Returning widget for each contest in contestList
-            return ContestDisplay(
-              contestList: contestList,
-            );
-          }),
+              // Returning widget for each contest in contestList
+              return ContestDisplay(
+                contestList: contestList,
+              );
+            }),
+      ),
     );
   }
 }
@@ -184,6 +197,7 @@ class SearchContests extends SearchDelegate {
   }
 }
 
+// Display all the contests supplied to the widget (as a list)
 class ContestDisplay extends StatefulWidget {
   final List<Contest> contestList;
 
@@ -202,55 +216,51 @@ class _ContestDisplayState extends State<ContestDisplay> {
   Widget build(BuildContext context) {
     return ListView(
       children: contestList.map((contest) {
-        return Card(
-          elevation: 8.0,
-          child: InkWell(
-            onTap: () => launch(contest.site),
-            child: ListTile(
-              isThreeLine: true,
-              title: Text(contest.title.split('@')[0]),
-              subtitle: Text(
-                contest.title.split('@')[1].trim() +
-                    "\n" +
-                    DateFormat.j().format(contest.startAt) +
-                    ", " +
-                    DateFormat.MMMEd().format(contest.startAt),
-              ),
-              trailing: IconButton(
-                  icon: Icon(Icons.calendar_today),
-                  onPressed: () async {
-                    var androidPlatformChannelSpecifics = new AndroidNotificationDetails(
-                        'id', 'Nexus', 'Channel for showing scheduled notifs',
-                        importance: Importance.Max, priority: Priority.High);
-                    var iOSPlatformChannelSpecifics = new IOSNotificationDetails();
-                    var platformChannelSpecifics = new NotificationDetails(androidPlatformChannelSpecifics, iOSPlatformChannelSpecifics);
-                    await flutterLocalNotificationsPlugin
-                        .schedule(
-                            0, 'Contest in an hour!', contest.title, contest.startAt.subtract(Duration(hours: 1)), platformChannelSpecifics,
-                            payload: ' ')
-                        .then((x) async {
-                      Scaffold.of(context).showSnackBar(SnackBar(
-                          content: Text("Scheduled reminder, you will be reminded of "
-                              "this contest an hour before it starts.")));
-                    });
-                  }),
-              leading: IconButton(
-                  icon: Icon(
-                    contest.isFavorite != null && contest.isFavorite ? Icons.favorite : Icons.favorite_border,
-                    color: contest.isFavorite != null && contest.isFavorite ? Colors.redAccent : Colors.grey,
-                  ),
-                  onPressed: () async {
-                    contest.isFavorite = contest.isFavorite != null ? !contest.isFavorite : true;
-                    var repo = new FuturePreferencesRepository<Contest>(new ContestDessert());
-                    if (contest.isFavorite)
-                      repo.save(contest);
-                    else
-                      repo.removeWhere((c) {
-                        return c.title == contest.title;
-                      });
-                    setState(() {});
-                  }),
+        return InkWell(
+          onTap: () => launch(contest.site),
+          child: ListTile(
+            title: Text(contest.title.split('@')[0]),
+            subtitle: Text(
+              contest.title.split('@')[1].trim() +
+                  ": " +
+                  DateFormat.j().format(contest.startAt) +
+                  ", " +
+                  DateFormat.MMMEd().format(contest.startAt),
             ),
+            trailing: IconButton(
+                icon: Icon(Icons.calendar_today),
+                onPressed: () async {
+                  var androidPlatformChannelSpecifics = new AndroidNotificationDetails(
+                      'id', 'Nexus', 'Channel for showing scheduled notifs',
+                      importance: Importance.Max, priority: Priority.High);
+                  var iOSPlatformChannelSpecifics = new IOSNotificationDetails();
+                  var platformChannelSpecifics = new NotificationDetails(androidPlatformChannelSpecifics, iOSPlatformChannelSpecifics);
+                  await flutterLocalNotificationsPlugin
+                      .schedule(
+                          0, 'Contest in an hour!', contest.title, contest.startAt.subtract(Duration(hours: 1)), platformChannelSpecifics,
+                          payload: ' ')
+                      .then((x) async {
+                    Scaffold.of(context).showSnackBar(SnackBar(
+                        content: Text("Scheduled reminder, you will be reminded of "
+                            "this contest an hour before it starts.")));
+                  });
+                }),
+            leading: IconButton(
+                icon: Icon(
+                  contest.isFavorite != null && contest.isFavorite ? Icons.favorite : Icons.favorite_border,
+                  color: contest.isFavorite != null && contest.isFavorite ? Colors.redAccent : Colors.grey,
+                ),
+                onPressed: () async {
+                  contest.isFavorite = contest.isFavorite != null ? !contest.isFavorite : true;
+                  var repo = new FuturePreferencesRepository<Contest>(new ContestDessert());
+                  if (contest.isFavorite)
+                    repo.save(contest);
+                  else
+                    repo.removeWhere((c) {
+                      return c.title == contest.title;
+                    });
+                  setState(() {});
+                }),
           ),
         );
       }).toList(),
@@ -258,6 +268,8 @@ class _ContestDisplayState extends State<ContestDisplay> {
   }
 }
 
+
+// Serialization helper class to store Contest information in the shared preferences
 class ContestDessert extends DesSer<Contest> {
   @override
   Contest deserialize(String s) {
