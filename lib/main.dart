@@ -54,7 +54,9 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<dom.Document> getCompetitions() async {
     var repo = new FuturePreferencesRepository<Contest>(new ContestDessert());
     favorites = await repo.findAll();
-    var response = await get("https://clist.by/");
+    print(favorites);
+    var response = await get("https://clist.by/").catchError((e) {print(e.toString() + "hi");});
+    print(response);
     return parse(response.body);
   }
 
@@ -222,51 +224,54 @@ class _ContestDisplayState extends State<ContestDisplay> {
   Widget build(BuildContext context) {
     return ListView(
       children: contestList.map((contest) {
-        return InkWell(
-          onTap: () => launch(contest.site),
-          child: ListTile(
-            title: Text(contest.title.split('@')[0]),
-            subtitle: Text(
-              contest.title.split('@')[1].trim() +
-                  ": " +
-                  DateFormat.j().format(contest.startAt) +
-                  ", " +
-                  DateFormat.MMMEd().format(contest.startAt),
-            ),
-            trailing: IconButton(
-                icon: Icon(Icons.calendar_today),
-                onPressed: () async {
-                  var androidPlatformChannelSpecifics = new AndroidNotificationDetails(
-                      'id', 'Nexus', 'Channel for showing scheduled notifs',
-                      importance: Importance.Max, priority: Priority.High);
-                  var iOSPlatformChannelSpecifics = new IOSNotificationDetails();
-                  var platformChannelSpecifics = new NotificationDetails(androidPlatformChannelSpecifics, iOSPlatformChannelSpecifics);
-                  await flutterLocalNotificationsPlugin
-                      .schedule(
-                          0, 'Contest in an hour!', contest.title, contest.startAt.subtract(Duration(hours: 1)), platformChannelSpecifics,
-                          payload: ' ')
-                      .then((x) async {
-                    Scaffold.of(context).showSnackBar(SnackBar(
-                        content: Text("Scheduled reminder, you will be reminded of "
-                            "this contest an hour before it starts.")));
-                  });
-                }),
-            leading: IconButton(
-                icon: Icon(
-                  contest.isFavorite != null && contest.isFavorite ? Icons.favorite : Icons.favorite_border,
-                  color: contest.isFavorite != null && contest.isFavorite ? Colors.redAccent : Colors.grey,
-                ),
-                onPressed: () async {
-                  contest.isFavorite = contest.isFavorite != null ? !contest.isFavorite : true;
-                  var repo = new FuturePreferencesRepository<Contest>(new ContestDessert());
-                  if (contest.isFavorite)
-                    repo.save(contest);
-                  else
-                    repo.removeWhere((c) {
-                      return c.title == contest.title;
+        return Card(
+          elevation: 4.0,
+          child: InkWell(
+            onTap: () => launch(contest.site),
+            child: ListTile(
+              title: Text(contest.title.split('@')[0]),
+              subtitle: Text(
+                contest.title.split('@')[1].trim() +
+                    ": " +
+                    DateFormat.j().format(contest.startAt) +
+                    ", " +
+                    DateFormat.MMMEd().format(contest.startAt),
+              ),
+              trailing: IconButton(
+                  icon: Icon(Icons.calendar_today),
+                  onPressed: () async {
+                    var androidPlatformChannelSpecifics = new AndroidNotificationDetails(
+                        'id', 'Nexus', 'Channel for showing scheduled notifs',
+                        importance: Importance.Max, priority: Priority.High);
+                    var iOSPlatformChannelSpecifics = new IOSNotificationDetails();
+                    var platformChannelSpecifics = new NotificationDetails(androidPlatformChannelSpecifics, iOSPlatformChannelSpecifics);
+                    await flutterLocalNotificationsPlugin
+                        .schedule(
+                            0, 'Contest in an hour!', contest.title, contest.startAt.subtract(Duration(hours: 1)), platformChannelSpecifics,
+                            payload: ' ')
+                        .then((x) async {
+                      Scaffold.of(context).showSnackBar(SnackBar(
+                          content: Text("Scheduled reminder, you will be reminded of "
+                              "this contest an hour before it starts.")));
                     });
-                  setState(() {});
-                }),
+                  }),
+              leading: IconButton(
+                  icon: Icon(
+                    contest.isFavorite != null && contest.isFavorite ? Icons.favorite : Icons.favorite_border,
+                    color: contest.isFavorite != null && contest.isFavorite ? Colors.redAccent : Colors.grey,
+                  ),
+                  onPressed: () async {
+                    contest.isFavorite = contest.isFavorite != null ? !contest.isFavorite : true;
+                    var repo = new FuturePreferencesRepository<Contest>(new ContestDessert());
+                    if (contest.isFavorite)
+                      repo.save(contest);
+                    else
+                      repo.removeWhere((c) {
+                        return c.title == contest.title;
+                      });
+                    setState(() {});
+                  }),
+            ),
           ),
         );
       }).toList(),
