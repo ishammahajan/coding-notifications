@@ -1,9 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:http/http.dart';
+import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' show parse;
 import 'package:html/dom.dart' as dom;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -54,10 +55,22 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<dom.Document> getCompetitions() async {
     var repo = new FuturePreferencesRepository<Contest>(new ContestDessert());
     favorites = await repo.findAll();
-    print(favorites);
-    var response = await get("https://clist.by/").catchError((e) {print(e.toString() + "hi");});
-    print(response);
-    return parse(response.body);
+    Uri url = Uri.parse("https://clist.by/");
+    var client = new HttpClient();
+    client.badCertificateCallback = (cert, str, i) {
+      return true;
+    };
+    var request = await client.getUrl(url).catchError((e) {
+      print(e.toString() + "hii");
+    });
+    HttpClientResponse response = await request.close().catchError((e) {
+      print(e.toString() + "hi");
+    });
+    var responseBytes = (await response.toList()).expand((x) => x);
+
+    //print(new String.fromCharCodes(responseBytes));
+    client.close();
+    return parse(new String.fromCharCodes(responseBytes));
   }
 
   @override
@@ -93,6 +106,7 @@ class _MyHomePageState extends State<MyHomePage> {
             builder: (_, snapshot) {
               if (!snapshot.hasData) return Center(child: CircularProgressIndicator());
               var contestElement = snapshot.data.getElementById("contests");
+              print(contestElement.children);
               contestList = favorites.toList();
               var contests = contestElement.getElementsByClassName("row contest coming");
 
@@ -112,25 +126,28 @@ class _MyHomePageState extends State<MyHomePage> {
                         endAt: DateTime.parse(currentContest[31].trim()).add(DateTime.now().timeZoneOffset),
                         site: currentContest[35].trim(),
                       );
-                if (!contestList.any((c) {
-                  return toBeAdded.title == c.title;
-                })) {
-                  if (favorites.length == contestList.length)
-                    contestList.add(toBeAdded);
-                  else
-                    for (int i = favorites.length; i < contestList.length; i++) {
-                      if (contestList.last.startAt.compareTo(toBeAdded.startAt) == -1) {
-                        contestList.add(toBeAdded);
-                        break;
+                if(!(toBeAdded.site.split('/').contains('acmu.ru') || toBeAdded.site.split('/').contains('dl.gsu.by') || toBeAdded.site
+                    .split('/').contains('neerc.ifmo.ru') || toBeAdded.site.split('/').contains('acmp.ru'))) {
+                  if (!contestList.any((c) {
+                    return toBeAdded.title == c.title;
+                  })) {
+                    if (favorites.length == contestList.length)
+                      contestList.add(toBeAdded);
+                    else
+                      for (int i = favorites.length; i < contestList.length; i++) {
+                        if (contestList.last.startAt.compareTo(toBeAdded.startAt) == -1) {
+                          contestList.add(toBeAdded);
+                          break;
+                        }
+                        if (contestList[i].startAt.compareTo(toBeAdded.startAt) == 1) {
+                          contestList.insert(i, toBeAdded);
+                          break;
+                        }
                       }
-                      if (contestList[i].startAt.compareTo(toBeAdded.startAt) == 1) {
-                        contestList.insert(i, toBeAdded);
-                        break;
-                      }
-                    }
+                  }
                 }
               });
-
+              print(contestList);
               // Returning widget for each contest in contestList
               return ContestDisplay(
                 contestList: contestList,
